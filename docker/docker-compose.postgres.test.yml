@@ -1,0 +1,18 @@
+version: "3"
+
+services:
+  postgres:
+    image: postgres:13.5-alpine
+    restart: always
+    container_name: agent-postgre-test
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_USER: ${POSTGRESQL_USER:-root}
+      POSTGRES_PASSWORD: ${POSTGRESQL_PASSWORD:-root}
+      POSTGRES_DB: ${POSTGRESQL_DATABASE:-test-agent}
+    tty: true
+    stdin_open: true
+    volumes:
+      - "../data/sql/postgresql:/tmp/sql"
+    expose:
+      - 5432

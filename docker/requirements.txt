@@ -1,0 +1,25 @@
+fastapi>=0.65.2
+joblib>=1.2.0
+# oauthlib==3.2.1
+urllib3>=1.26.5
+# websockets==9.1
+uvicorn>=0.18.3
+gunicorn>=21.2.0
+pytz>=2020.1
+python-dotenv>=0.10.4
+requests>=2.31.0
+# pandas==1.1.5
+tzlocal>=2.1
+pandas>=2.0.3
+pyarrow>=12.0.1
+pydantic<2.0
+httpx
+APScheduler==3.6.3
+python-jose[cryptography]
+passlib[bcrypt]==1.7.4
+langchain
+langchain-openai
+langgraph
+tenacity
+langchain-community
+langchain-chroma

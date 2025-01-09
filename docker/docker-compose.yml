@@ -1,0 +1,20 @@
+version: '3.7'
+
+services:
+  ems-service:
+    image: operation-agent
+    container_name: operation-agent
+    restart: unless-stopped
+    volumes:
+      - /home/hankliang/data/operation-agent/logs:/home/app/workdir/data/logs
+    env_file:
+      - ./agent.env
+    ports:
+      - "8601:8888"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+        test: curl -fs http://localhost:8888/v1/service/health_check || exit 1
+        interval: 5s
+        timeout: 5s
+        retries: 5
