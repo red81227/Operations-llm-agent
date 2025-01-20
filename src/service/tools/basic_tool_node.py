@@ -4,6 +4,12 @@ from langchain_core.messages import ToolMessage
 from langchain_core.messages import ToolCall
 from typing import List, Optional
 import uuid
+from src.operator.redis import RedisOperator
+from src.service.event.redis.tool_logs import ToolLogs
+from config.logger_setting import log
+
+redis_operator = RedisOperator()
+tool_logs = ToolLogs(operator=redis_operator)
 
 def process_tool_message(content: str) -> List[ToolCall]:
     # 使用正则表达式查找所有 <tool_call>...</tool_call> 块
@@ -36,6 +42,17 @@ class BasicToolNode:
             message = messages[-1]
         else:
             raise ValueError("No message found in input")
+        
+        log.info("input 11111111111")
+        log.info(inputs)
+
+        log.info("message 11111111111")
+        log.info(message)
+        user_id = messages[0].additional_kwargs.get("user_id")
+        log.info("user_id 11111111111")
+        log.info(user_id)
+        if not user_id:
+            raise ValueError("User ID is required in inputs.")
 
         tool_call_message = process_tool_message(inputs["messages"][-1].content)        
         outputs = []
@@ -43,11 +60,21 @@ class BasicToolNode:
             tool_result = self.tools_by_name[tool_call["name"]].invoke(
                 tool_call["args"]
             )
-            outputs.append(
-                ToolMessage(
+            outputs.append(ToolMessage(
                     content=json.dumps(tool_result),
                     name=tool_call["name"],
                     tool_call_id=tool_call["id"],
-                )
+                ))
+
+            tool_message_dict={
+                    "tool_name": tool_call["name"],
+                    "tool_args": tool_call["args"],
+                    "tool_result": tool_result,
+                }
+            
+            tool_logs.add_log(
+                user_id=user_id,
+                tool_message=json.dumps(tool_message_dict)
             )
+        
         return {"messages": outputs}

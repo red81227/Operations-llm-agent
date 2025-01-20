@@ -64,12 +64,12 @@ def scheduled_weather_task(llm, user_id: str, location_names: List[str], element
     # 抓取氣象資料
     weather_data_str = fetch_weather_data(location_names, element_names)
     # 送入 LLM 作簡單檢查或處理
-    prompt = f"请检查以下天气数据的完整性：{weather_data_str}"
+    prompt = f"请检查以下数据的完整性：{weather_data_str}"
     llm_response = llm.invoke(prompt)
 
     # 結果記錄與推播
-    llm_message = llm_response.content.strip()
-    log.info(f"[Scheduler Task] LLM response: {llm_message}")
+    llm_message = llm_response.content.strip() + "\n" + weather_data_str
+    log.info(f"[Scheduler Task] LLM response: {llm_message}, weather_data_str: {weather_data_str}")
 
     # 主動推播訊息到 Teams
     send_message_to_teams(bot_config.node_server_url, user_id, message=llm_message)

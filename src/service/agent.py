@@ -13,10 +13,13 @@ import datetime
 from config.logger_setting import log
 from langchain_openai import ChatOpenAI
 from src.models.query import Output
+from src.service.event.redis.tool_logs import ToolLogs
 from src.service.tools.basic_tool_node import BasicToolNode, process_tool_message
 from src.service.tools.get_weather_information import get_weather_information, schedule_get_weather_information
 from config.project_setting import llm_config
 from langchain_community.tools.tavily_search import TavilySearchResults
+from src.operator.redis import RedisOperator
+
 
 
 class AgentService:
@@ -36,6 +39,9 @@ class AgentService:
         self.llm_with_tools = self.llm.bind_tools(tools)
         self.tool_node = BasicToolNode(tools)
         self.app = self.init_workflow_app()
+
+        redis_operator = RedisOperator()
+        self.tool_logs = ToolLogs(redis_operator)
         
 
     def chat(self, query: str, user_id: int) -> Output:
@@ -175,35 +181,48 @@ class AgentService:
         else:
             user_info_message = SystemMessage(content=f"user_id: {user_id}")
             messages = [user_info_message] + state["messages"]
-        # 定義 prompt
+        
+        #取出過往使用tool的紀錄
+        logs = self.tool_logs.get_logs(user_id=user_id)
 
         primary_assistant_prompt = ChatPromptTemplate.from_messages(
             [
                 (
                     "system",
-                    "You are a customer support assistant for a weather website. "
-                    "Respond to user queries exclusively using the information provided by the available tools. "
-                    "Do not generate any information beyond what the tools provide. "
-                    "If the initial search yields no results, broaden your search parameters and try again. "
-                    "Under no circumstances should you fabricate answers; all responses must be based solely on the tool outputs. "
-                    "Before using any tool, ensure that all parameters are correct and properly formatted to prevent errors."
-                    "要啟動排程服務一定要使用工具"
-                    "\n\nuser_id:\n<User>\n{user_id}\n</User>"
-                    "\nCurrent time: {time}."
-                    "一定要使用繁體中文輸出",
+                    (
+                        "You are a customer support assistant for a weather website. "
+                        "Your responses must rely solely on the information provided by the available tools. "
+                        "Do not fabricate any information under any circumstances. "
+                        "If an initial tool search yields no results, broaden the search parameters and try again. "
+                        "Ensure all tool parameters are correct and properly formatted before using any tool to avoid errors.\n"
+                        "\nHere are the recent tool usage logs: {logs}"
+                        "\nRespond based on the tool usage logs. Avoid making assumptions or creating unsupported answers. "
+                        "If the logs do not contain the required information, select and use the most appropriate tool.\n"
+                        "\nIf the user wants to continue a task or initiate a schedule, search for tools with names starting with 'schedule' "
+                        "and determine if any are suitable for the request.\n"
+                        "\nSchedules must always be initiated through the appropriate tools; do not start them manually.\n"
+                        "\nVerify in the recent tool usage logs if a schedule was successfully initiated. "
+                        "Only consider the service initiated if a schedule is found in the logs.\n"
+                        "\nIf the user tries to initiate duplicate schedules for the same context, remind them to avoid redundancy.\n"
+                        "\nUser ID: <User>{user_id}</User>"
+                        "\nCurrent time: {time}."
+                        "\n除了使用tool，一定要使用繁體中文輸出"
+                    ),
                 ),
                 ("user", "{messages}"),
             ]
         ).partial(
+            logs=logs,
             time=datetime.datetime.now,
-            user_id=user_id
+            user_id=user_id,
         )
+
 
         part_1_assistant_runnable = primary_assistant_prompt | self.llm_with_tools
         response = part_1_assistant_runnable.invoke(messages)
 
         # We return a list, because this will get added to the existing list
-        return {'messages': response}
+        return {'messages': response, 'user_id': user_id}
 
     @staticmethod
     def route_tools(state: MessagesState):

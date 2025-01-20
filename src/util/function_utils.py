@@ -1,4 +1,5 @@
 """This file is for utility function"""
+import json
 import os
 from typing import List
 import time
@@ -87,12 +88,19 @@ def generate_id():
 
 def send_message_to_teams(node_server_url: str, user_id: str, message: str):
     """Send a message to the Teams user using the Node server"""
-    data = {
-        "userId": user_id,
-        "message": message
-    }
-    response = requests.post(node_server_url, json=data)
-    if response.status_code == 200:
-        print("Message sent successfully")
-    else:
-        print("Failed to send message:", response.text)
+
+
+    webhook_url = "https://fetonline.webhook.office.com/webhookb2/f68a2cc8-a443-4621-b329-ca445d7f0b13@bb5ad653-221f-4b94-9c26-f815e04eef40/IncomingWebhook/e26539dd88ef44768cc549108bf17308/a7338cfa-2b0d-49ac-8b5b-7eee6e494011/V2P6R_9YA_VaM_CRCyXGNU5Qn3AoIGZZTw1MIAcYP_jb41"
+
+    try:
+        data = {
+            'title': '標題 天氣資料排程服務',
+            'text': message
+        }
+        headers = {'Content-Type': 'application/json'}
+        requests.post(url=webhook_url, headers=headers, data=json.dumps(data), verify=False)
+        
+    except Exception as err:
+        print('Other error occurred %s' % {err})
+
+    

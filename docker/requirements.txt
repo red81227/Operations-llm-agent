@@ -23,3 +23,4 @@ langgraph
 tenacity
 langchain-community
 langchain-chroma
+redis==4.1.4
