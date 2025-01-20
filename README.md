@@ -64,7 +64,3 @@ Obtain valid LLM credentials and update them in the ./docker/linux/agent.env fil
 
 > This project is a work in progress and welcomes contributions or feedback.  
 > 本專案正在開發中，歡迎提供建議或貢獻！  
-
---- 
-
-這樣的格式更便於讀者快速理解專案內容，並提高整體專業度。
