@@ -19,7 +19,9 @@ from src.service.tools.get_weather_information import get_weather_information, s
 from config.project_setting import llm_config
 from langchain_community.tools.tavily_search import TavilySearchResults
 from src.operator.redis import RedisOperator
-
+from src.service.tools.mqtt_watcher import watch_device_status_by_mqtt
+from config.project_setting import tavily_config
+import os 
 
 
 class AgentService:
@@ -34,7 +36,8 @@ class AgentService:
                 top_p=llm_config.top_p,
                 frequency_penalty=llm_config.frequency_penalty,
             )
-        tools = [get_weather_information, schedule_get_weather_information, TavilySearchResults(max_results=3)]
+        os.environ['TAVILY_API_KEY'] = tavily_config.api_key
+        tools = [get_weather_information, schedule_get_weather_information, TavilySearchResults(max_results=3), watch_device_status_by_mqtt]
         
         self.llm_with_tools = self.llm.bind_tools(tools)
         self.tool_node = BasicToolNode(tools)
@@ -104,9 +107,10 @@ class AgentService:
 
         # 定義 prompt
         prompt = f"""
-        Below is a question: "{messages}"
-        Please determine whether this question is related to the weather API service. If it is, respond with "Yes"; otherwise, respond with "No".
-        """
+            Below is a question: "{messages}"
+            Please determine whether this question is related to the weather API service or the device status monitoring service.
+            If it is, respond with "Yes"; otherwise, respond with "No".
+            """
 
         # 調用 LLM
         llm_response = self.llm.invoke(prompt)

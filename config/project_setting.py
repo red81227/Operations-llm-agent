@@ -8,21 +8,21 @@ class ServiceConfig(BaseSettings):
     log_file_path: str = 'data/logs/'
     log_file_name: str = 'service_ems_school_llm.log'
     system_name: str = "service_ems_school_llm"
-    # it is hashed value from 'secret'
-    default_hashed_password: str = "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW"
+
+    mqtt_queue_size: int = 10000
+    mqtt_thread_size: int = 3
 
 class LlmConfig(BaseSettings):
-    api_key: str = ""
-    llm_url: str = ""
-    llm_model: str = ""
+    api_key: str = Field("", env="API_KEY")
+    llm_url: str = Field("", env="LLM_URL")
+    llm_model: str = Field("", env="LLM_MODEL")
     temperature: float = 0
     max_retries: int = 2
     top_p: float = 0.9
     frequency_penalty: float = 0
 
 class BotConfig(BaseSettings):
-    node_server_url: str = "https://teams.microsoft.com/l/channel/19%3A9UodnXhzLX8Sy5nEEqzeo3WO_TNbeUzMTLNR6bDTgEw1%40thread.tacv2/%E6%8E%92%E7%A8%8B%E6%8F%90%E7%A4%BA?groupId=f68a2cc8-a443-4621-b329-ca445d7f0b13"
-
+    node_server_url: str =  Field("", env="NODE_SERVER_URL")
 
 class RedisConfigSettings(BaseSettings):
     host: str = Field("redis", env="REDIS_HOST")
@@ -30,8 +30,12 @@ class RedisConfigSettings(BaseSettings):
     password: str = Field(None, env="REDIS_PASSWORD")
     db: int = Field(0, env="REDIS_DB")
 
+class TavilyConfig(BaseSettings):
+    api_key: str = Field("", env="TAVILY_API_KEY")
 
 service_config = ServiceConfig()
 llm_config = LlmConfig()
 bot_config = BotConfig()
 redis_config = RedisConfigSettings()
+tavily_config = TavilyConfig()
+

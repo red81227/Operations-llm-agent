@@ -1,8 +1,7 @@
 import json
 import re
-from langchain_core.messages import ToolMessage
-from langchain_core.messages import ToolCall
-from typing import List, Optional
+from langchain_core.messages import ToolMessage, ToolCall
+from typing import List
 import uuid
 from src.operator.redis import RedisOperator
 from src.service.event.redis.tool_logs import ToolLogs
@@ -12,7 +11,6 @@ redis_operator = RedisOperator()
 tool_logs = ToolLogs(operator=redis_operator)
 
 def process_tool_message(content: str) -> List[ToolCall]:
-    # 使用正则表达式查找所有 <tool_call>...</tool_call> 块
     matches = re.findall(r'<tool_call>\s*(\{.*?\})\s*</tool_call>', content, re.DOTALL)
     tool_calls = []
     for match in matches:
@@ -26,11 +24,11 @@ def process_tool_message(content: str) -> List[ToolCall]:
             )
             tool_calls.append(tool_call)
         except json.JSONDecodeError:
-            print("无法解析工具调用的 JSON 数据。")
+            log.error("Unable to parse tool call JSON data.")
     if not tool_calls:
-        print("未找到工具调用信息。")
+        log.warning("No tool call information found.")
     return tool_calls
-        
+
 class BasicToolNode:
     """A node that runs the tools requested in the last AIMessage."""
 
@@ -38,40 +36,34 @@ class BasicToolNode:
         self.tools_by_name = {tool.name: tool for tool in tools}
 
     def __call__(self, inputs: dict):
-        if messages := inputs.get("messages", []):
-            message = messages[-1]
-        else:
+        messages = inputs.get("messages", [])
+        if not messages:
             raise ValueError("No message found in input")
         
-        log.info("input 11111111111")
-        log.info(inputs)
-
-        log.info("message 11111111111")
-        log.info(message)
+        message = messages[-1]
+        log.info("Input: %s", inputs)
+        log.info("Message: %s", message)
+        
         user_id = messages[0].additional_kwargs.get("user_id")
-        log.info("user_id 11111111111")
-        log.info(user_id)
+        log.info("User ID: %s", user_id)
         if not user_id:
             raise ValueError("User ID is required in inputs.")
 
-        tool_call_message = process_tool_message(inputs["messages"][-1].content)        
+        tool_call_messages = process_tool_message(message.content)
         outputs = []
-        for tool_call in tool_call_message:
-            tool_result = self.tools_by_name[tool_call["name"]].invoke(
-                tool_call["args"]
-            )
+        for tool_call in tool_call_messages:
+            tool_result = self.tools_by_name[tool_call.name].invoke(tool_call.args)
             outputs.append(ToolMessage(
-                    content=json.dumps(tool_result),
-                    name=tool_call["name"],
-                    tool_call_id=tool_call["id"],
-                ))
+                content=json.dumps(tool_result),
+                name=tool_call.name,
+                tool_call_id=tool_call.id,
+            ))
 
-            tool_message_dict={
-                    "tool_name": tool_call["name"],
-                    "tool_args": tool_call["args"],
-                    "tool_result": tool_result,
-                }
-            
+            tool_message_dict = {
+                "tool_name": tool_call.name,
+                "tool_args": tool_call.args,
+                "tool_result": tool_result,
+            }
             tool_logs.add_log(
                 user_id=user_id,
                 tool_message=json.dumps(tool_message_dict)
