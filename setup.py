@@ -8,7 +8,7 @@ with open('README.md') as f:
 
 setup(
     project_name='service-operation-agent',
-    project_version='0.0.2',
+    project_version='0.0.3',
     description='In this project, we will develop LLM application for school EMS system',
     long_description=readme_text,
     author='Hank Liang',

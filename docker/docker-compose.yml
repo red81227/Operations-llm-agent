@@ -7,6 +7,7 @@ services:
     restart: unless-stopped
     volumes:
       - /home/hankliang/data/operation-agent/logs:/home/app/workdir/data/logs
+      - /home/hankliang/data/operation-agent/workflow_graphs:/home/app/workdir/data/workflow_graphs
     env_file:
       - ./agent.env
     ports:

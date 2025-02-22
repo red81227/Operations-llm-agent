@@ -3,13 +3,16 @@ import queue
 import threading
 import traceback
 from typing import Annotated, Any, Dict, Union
-from config.project_setting import llm_config, bot_config, service_config
+import uuid
+from config.project_setting import deepseek_llm_config, bot_config, service_config
 from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool, InjectedToolArg
+from langchain_core.messages import ToolMessage
 from langgraph.types import interrupt
 from config.logger_setting import log
 from src.operator.mqtt import MQTTService
 from src.util.function_utils import send_message_to_teams
+from functools import partial
 
 class DeviceMqttWatcher:
     def __init__(self):
@@ -19,14 +22,13 @@ class DeviceMqttWatcher:
         self._mqtt_queue = queue.Queue(maxsize=service_config.mqtt_queue_size)
         self._thread_list = []
         self._process = True
-        self.llm = ChatOpenAI(
-            api_key=llm_config.api_key,
-            base_url=llm_config.llm_url,
-            model=llm_config.llm_model,
-            temperature=llm_config.temperature,
-            max_retries=llm_config.max_retries,
-            top_p=llm_config.top_p,
-            frequency_penalty=llm_config.frequency_penalty,
+        self.deepseek_llm = ChatOpenAI(
+            api_key=deepseek_llm_config.api_key,
+            base_url=deepseek_llm_config.llm_url,
+            model=deepseek_llm_config.llm_model,
+            temperature=deepseek_llm_config.temperature,
+            max_retries=deepseek_llm_config.max_retries,
+            frequency_penalty=deepseek_llm_config.frequency_penalty,
         )
 
     def start_thread(self):
@@ -93,7 +95,7 @@ class DeviceMqttWatcher:
             serial_number: {serial_number}
             message：{message}"""
 
-            llm_response = self.llm.invoke(prompt)
+            llm_response = self.deepseek_llm.invoke(prompt)
             decision = llm_response.content.strip()
 
             if "no message" not in decision:
@@ -106,6 +108,21 @@ class DeviceMqttWatcher:
 device_mqtt_watcher = DeviceMqttWatcher()
 device_mqtt_watcher.start_thread()
 
+def custom_on_message(client, userdata, msg, user_id, serial_number):
+    try:
+        log_msg = msg.payload.decode('utf-8')
+        topic = msg.topic
+
+        mqtt_task = {
+            'message': log_msg,
+            'topic': topic,
+            'user_id': user_id,
+            'serial_number': serial_number
+        }
+        device_mqtt_watcher.produce_mqtt_task(**mqtt_task)
+    except Exception as e:
+        return f"Custom on_message processing failed: {e}"
+    
 @tool
 def watch_device_status_by_mqtt(
     duration: Annotated[int, InjectedToolArg],
@@ -128,39 +145,32 @@ def watch_device_status_by_mqtt(
                     不想使用監控設備MQTT請回答[否]"""
     })
 
-    if serial_number == "no":
+    log.info(f"User provided serial number: {serial_number}")
+
+    if serial_number == "no" or serial_number == "否":
         return {"message": "User cancelled the MQTT operation, maybe user needs to do something else, MQTT monitoring task aborted."}
     
-    def custom_on_message(client, userdata, msg):
-        try:
-            log_msg = msg.payload.decode('utf-8')
-            topic = msg.topic
-
-            mqtt_task = {
-                'message': log_msg,
-                'topic': topic,
-                'user_id': user_id,
-                'serial_number': serial_number
-            }
-            device_mqtt_watcher.produce_mqtt_task(**mqtt_task)
-        except Exception as e:
-            return f"Custom on_message processing failed: {e}"
+    partial_on_message = partial(custom_on_message,
+                                 user_id=user_id,
+                                 serial_number=serial_number)
+    
     
     try:
         mqtt_service = MQTTService(
-            broker_host="ssl://mqttd.fetnet.net:8883",
+            broker_host="mqttd.fetnet.net",
             broker_port=8883,
             topic="evcharging/v2/telemetry/statusNotification/#",
             username="evcharging_hsinchu",
             password="Eft8vhDP",
             log_queue=device_mqtt_watcher._mqtt_queue,
-            on_message_callback=custom_on_message
+            on_message_callback=partial_on_message
         )
         mqtt_service.start()
 
         stop_timer = threading.Timer(duration, mqtt_service.stop)
         stop_timer.start()
 
-        return {"message": "Successfully initiated MQTT monitoring task."}
+        return f"已啟動監控設備MQTT資訊，持續時間 {duration} 秒"
     except Exception as e:
         return {"error": str(e)}
+    

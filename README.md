@@ -19,7 +19,7 @@ Currently in the development phase, with the Meteorological Bureau's Open API se
 
 ---
 
-## ToDo (待辦項目)
+## Doing (開發中)
 
 1. **MQTT Monitoring Service**
    - 啟動 MQTT 訂閱，過濾訊息並解析內容，提供使用者目標資訊。例如：監控特定設備序列的狀態，檢視是否安裝成功或失敗，並分析失敗的階段。
@@ -52,6 +52,9 @@ Before starting the service, ensure the following tools are installed:
 ./docker/linux/run_build_image.sh
 ```
 
+##
+
+請進入./docker/linux/agent.env 修改環境變數，一定要提供llm連線方式給服務。
 ---
 
 ## Start the Service (啟動服務)

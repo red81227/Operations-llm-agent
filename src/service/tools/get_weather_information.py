@@ -9,7 +9,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from langchain_core.tools import tool, InjectedToolArg
 from langgraph.types import interrupt
 from config.logger_setting import log
-from config.project_setting import llm_config, bot_config
+from config.project_setting import bot_config,deepseek_llm_config
 from langchain_openai import ChatOpenAI
 from src.util.function_utils import send_message_to_teams
 
@@ -85,7 +85,7 @@ def get_weather_information(
     此函數調用中央氣象局開放數據平台的 API，獲取各縣市或國際都市的今明36小時天氣預報。
     
     Args:
-        locationName (list[str]): 查詢的地點名稱，請使用繁體中文，例如：["桃園縣"]。
+        locationName (list[str]): 查詢的地點名稱，請使用繁體中文，例如：["桃園縣"]。locationName 可以是以下縣市名稱之一： '臺北市', '新北市', '桃園市', '臺中市', '臺南市', '高雄市', '新竹縣', '苗栗縣', '彰化縣', '南投縣', '雲林縣', '嘉義縣', '屏東縣', '宜蘭縣', '花蓮縣', '臺東縣', '澎湖縣', '金門縣','連江縣,' '基隆市', '新竹市', '嘉義市'。請依據使用這需求提供正確的縣市名稱。
         elementName (list[str]): 氣象要素的英文代碼，可選值：
             - "Wx"：天氣現象
             - "MaxT"：最高溫度
@@ -122,14 +122,15 @@ def schedule_get_weather_information(
     """
     持續獲取指定地點的特定氣象要素的天氣預報信息。此函數會啟動一個排程服務，
     在指定的 start_time (格式 "YYYY-MM-DD HH:MM:SS") 開始，
-    持續 duration 分鐘，每 frequency 秒呼叫一次天氣API。
-    
+    持續 duration 分鐘，每 frequency 秒呼叫一次天氣API，請依據使用者需求決定排程持續時間（duration 分鐘）與排程執行間隔（frequency秒）。
+               
+
     Args:
-        locationName (list[str]): 查詢的地點名稱（繁體中文，如 ["桃園縣"]）。
+        locationName (list[str]): 查詢的地點名稱（繁體中文，如 ["桃園縣"]）。locationName 可以是以下縣市名稱之一： '臺北市', '新北市', '桃園市', '臺中市', '臺南市', '高雄市', '新竹縣', '苗栗縣', '彰化縣', '南投縣', '雲林縣', '嘉義縣', '屏東縣', '宜蘭縣', '花蓮縣', '臺東縣', '澎湖縣', '金門縣','連江縣,' '基隆市', '新竹市', '嘉義市'。請依據使用這需求提供正確的縣市名稱。
         elementName (list[str]): 氣象要素的英文代碼 ("Wx", "MaxT", "MinT", "CI", "PoP")。
         start_time (str): 排程開始時間，格式 "YYYY-MM-DD HH:MM:SS"。
-        duration (int): 排程持續時間（分鐘）。
-        frequency (int): 排程執行間隔（秒）。
+        duration (int): 排程持續時間（分鐘），預設60分鐘，如果使用者有提供排程持續時間，請依照使用者需求帶入，注意單位是分鐘。
+        frequency (int): 排程執行間隔（秒），預設60秒，如果使用者有提供排程間隔時間，請依照使用者需求帶入，注意單位是秒。
         user_id (str): 代表當前對話使用者的 ID。請在 Prompt 中尋找以 'user_id:' 為標記的字串 (例如 "user_id: <some_value>")，並在呼叫此工具時，將該值帶入本參數，以確保正確識別並對應到使用者。
 
     Returns:
@@ -155,13 +156,12 @@ def schedule_get_weather_information(
 
         # 初始化 LLM
         llm = ChatOpenAI(
-            api_key=llm_config.api_key,
-            base_url=llm_config.llm_url,
-            model=llm_config.llm_model,
-            temperature=llm_config.temperature,
-            max_retries=llm_config.max_retries,
-            top_p=llm_config.top_p,
-            frequency_penalty=llm_config.frequency_penalty,
+            api_key=deepseek_llm_config.api_key,
+            base_url=deepseek_llm_config.llm_url,
+            model=deepseek_llm_config.llm_model,
+            temperature=deepseek_llm_config.temperature,
+            max_retries=deepseek_llm_config.max_retries,
+            frequency_penalty=deepseek_llm_config.frequency_penalty,
         )
 
         scheduler = initialize_scheduler()
@@ -201,10 +201,5 @@ def schedule_get_weather_information(
 
     else:
         # 使用者拒絕或希望調整參數
-        tool_message = {
-            'message': (
-                "使用者決定不使用排程服務或希望調整參數。"
-                f"這是使用者的回覆: {user_approval}，請再次確認。"
-            )
-        }
-        return json.dumps(tool_message, ensure_ascii=False)
+
+        return f"human_respond:使用者決定不使用排程服務或希望調整參數。這是使用者的回覆: {user_approval}，請再次確認。"

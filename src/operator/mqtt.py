@@ -1,5 +1,7 @@
 import paho.mqtt.client as mqtt
 import threading
+from config.logger_setting import log
+
 import queue
 
 
@@ -22,7 +24,7 @@ class MQTTService:
         self.topic = topic
         self.log_queue = log_queue
         self.client = mqtt.Client()
-        self.client.username_pw_set(username=username, password=password)
+        self.client.username_pw_set(username, password)
         self.on_message_callback = on_message_callback
 
     def on_connect(self, client, userdata, flags, rc):
@@ -55,10 +57,9 @@ class MQTTService:
         else:
             try:
                 log_msg = msg.payload.decode('utf-8')
-                print(f"Received message: {log_msg}")
                 self.log_queue.put(log_msg)
             except Exception as e:
-                print(f"Failed to process message: {e}")
+                log.info(f"Failed to process message: {e}")
 
     def start(self):
         """
