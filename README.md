@@ -10,6 +10,10 @@ Currently in the development phase, with the Meteorological Bureau's Open API se
 
 ![Alt text](./workflow_graph.png)
 ---
+目前的llm agent workflow
+Current workflow of agent
+![workflow_graph](https://github.com/user-attachments/assets/91e8bf7e-f694-4580-be91-7156340fa088)
+
 
 ## Features (已完成功能)
 
