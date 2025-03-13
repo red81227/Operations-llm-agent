@@ -8,12 +8,11 @@ To create a maintenance agent that can be used by project managers (PMs), sales,
 目前處於開發階段，使用氣象局空開 API 作為後端服務的範例。
 Currently in the development phase, with the Meteorological Bureau's Open API serving as a backend service example.
 
-![Alt text](./workflow_graph.png)
+
 ---
 目前的llm agent workflow
 Current workflow of agent
-![workflow_graph](https://github.com/user-attachments/assets/91e8bf7e-f694-4580-be91-7156340fa088)
-
+![Alt text](./workflow_graph.png)
 
 ## Features (已完成功能)
 

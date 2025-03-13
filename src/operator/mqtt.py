@@ -23,9 +23,14 @@ class MQTTService:
         self.broker_port = broker_port
         self.topic = topic
         self.log_queue = log_queue
+        self.on_message_callback = on_message_callback
         self.client = mqtt.Client()
         self.client.username_pw_set(username, password)
-        self.on_message_callback = on_message_callback
+        self.client.tls_set()
+        self.client.on_connect = self.on_connect
+        self.client.on_message = self.on_message
+        self._loop_thread_started = False
+        self.connected = False
 
     def on_connect(self, client, userdata, flags, rc):
         """
@@ -42,6 +47,7 @@ class MQTTService:
             client.subscribe(self.topic)
         else:
             print("Failed to connect to MQTT broker")
+
 
     def on_message(self, client, userdata, msg):
         """
@@ -62,20 +68,20 @@ class MQTTService:
                 log.info(f"Failed to process message: {e}")
 
     def start(self):
-        """
-        開始 MQTT 服務，包括連接和訂閱主題。
-        """
-        self.client.on_connect = self.on_connect
-        self.client.on_message = self.on_message
-        self.client.connect(self.broker_host, self.broker_port, 60)
-
-        thread = threading.Thread(target=self.client.loop_forever, daemon=True)
-        thread.start()
-        print("MQTTService started and listening...")
+        if not self._loop_thread_started:
+            self.client.connect(self.broker_host, self.broker_port, 60)
+            # 啟動 MQTT 網路執行線，開始監聽
+            self.client.loop_start()  # 背景執行線處理 MQTT
+            self._loop_thread_started = True
+            log.info("MQTT 監聽服務已啟動")
 
     def stop(self):
-        """
-        停止 MQTT 服務，包括斷開連接。
-        """
-        self.client.disconnect()
-        print("MQTTService stopped.")
+        if self._loop_thread_started:
+            self.client.loop_stop()   # 停止背景執行線
+            self.client.disconnect()
+            self._loop_thread_started = False
+            self.connected = False
+            log.info("MQTT 監聽服務已停止")
+
+    def is_running(self):
+        return self._loop_thread_started

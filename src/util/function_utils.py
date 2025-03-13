@@ -2,6 +2,7 @@
 import json
 import os
 from config.logger_setting import log
+import re
 from typing import List
 import time
 from functools import lru_cache
@@ -103,4 +104,17 @@ def send_message_to_teams(node_server_url: str, user_id: str, message: str):
     except Exception as err:
         print('Other error occurred %s' % {err})
 
-    
+def extract_direct_answer(content: str) -> str:
+    """
+    從模型的輸出中移除所有 <think>...</think> 區塊，
+    """
+    # 移除所有 <think>...</think> 區塊（DOTALL 表示換行也能匹配）
+    return re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL)
+
+def extract_thinking(content: str) -> str:
+    """
+    從模型的輸出中擷取所有 <think>...</think> 區塊，
+    並回傳其中的內容。
+    """
+    # 擷取所有 <think>...</think> 區塊
+    return re.findall(r"<think>(.*?)</think>", content, flags=re.DOTALL)

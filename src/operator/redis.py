@@ -40,3 +40,15 @@ class RedisOperator:
     def expire(self, name: str, time):
         """Set an expiration time on a key."""
         return self.redis_conn.expire(name, time)
+
+    def set(self, name: str, value):
+        """Set a key in Redis."""
+        return self.redis_conn.set(name, value)
+    
+    def get(self, name: str):
+        """Get a key from Redis."""
+        return self.redis_conn.get(name)
+    
+    def delete(self, name: str):
+        """Delete a key from Redis."""
+        return self.redis_conn.delete(name)
