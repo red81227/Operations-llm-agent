@@ -1,4 +1,5 @@
 """This module contains class to for user service."""
+
 from typing import Literal, Optional, Dict, Any, List
 import datetime
 import os
@@ -9,7 +10,12 @@ from src.models.query import Output
 from src.service.event.redis.tool_logs import ToolLogs
 from src.service.event.redis.user_state import UserState
 from src.service.tools.basic_tool_node import BasicToolNode
-from src.service.tools.get_weather_information import get_weather_information, schedule_get_weather_information
+from src.service.tools.get_weather_information import (
+        get_weather_information, 
+        schedule_get_weather_information,
+        list_weather_schedules,
+        stop_weather_schedule
+    )
 from config.project_setting import qwen_14b_awq_llm_config, deepseek_32b_awq_llm_config, deepseek_14b_awq_llm_config
 from src.operator.redis import RedisOperator
 from src.service.tools.mqtt_watcher import watch_device_status_by_mqtt
@@ -93,6 +99,8 @@ class AgentService:
     11. 確認*工具使用日誌*工具使用後的結果，結果可能是工具的回傳值，也可能是使用者希望對工具參數進行修改的需求，也有可能執行失敗，請根據工具回傳結果，適當的執行工具或是回復。
     12. 如果決定使用工具，只回傳*工具名稱*與*工具參數*，不要有其他資訊。
     13. 如果參數與時間相關，例如持續時間或執行頻率，請仔細看清楚工具所要帶入的時間單位是小時、分鐘或是秒。
+    14. 如果使用者希望查詢排程任務，請使用「list_weather_schedules」工具查詢目前進行中的排程。
+    15. 如果使用者希望停止排程任務，請使用「stop_weather_schedule」工具停止指定的排程任務。
 
     【當前資訊】
     最新的訊息：{latest_message}
@@ -167,7 +175,9 @@ class AgentService:
         self.tools = [
             get_weather_information, 
             schedule_get_weather_information, 
-            watch_device_status_by_mqtt
+            watch_device_status_by_mqtt,
+            list_weather_schedules,
+            stop_weather_schedule
         ]
         
         self.qwen_llm_with_tools = self.qwen_14b_awq_llm.bind_tools(self.tools)
@@ -215,6 +225,21 @@ class AgentService:
             • duration (int): 監聽服務的持續時間，單位為秒。預設值為 3600 秒，如果使用者有提供監聽服務的持續時間，請依照使用者需求帶入。
         - 回傳：
             • str：成功訊息或錯誤描述。
+            
+        4. list_weather_schedules
+        - 功能：列出當前使用者的所有進行中的天氣預報排程。
+        - 說明：此工具會返回使用者目前啟動的所有天氣預報定時任務，包含每個任務的詳細資訊，如查詢地點、氣象要素、開始和結束時間、更新頻率等。
+        - 參數：無需額外參數
+        - 回傳：
+            • str：JSON 字串格式，包含所有進行中定時任務的資訊；若無排程或查詢失敗，則回傳相應的訊息。
+            
+        5. stop_weather_schedule
+        - 功能：停止指定的天氣預報排程任務。
+        - 說明：用戶可以通過提供排程任務的 job_id 來停止特定的天氣預報排程。如果用戶沒有提供 job_id，系統會請求用戶先使用 list_weather_schedules 工具查詢目前進行中的排程，然後選擇要停止的排程。
+        - 參數：
+            • job_id (str): 選填，要停止的排程任務 ID。若未提供，系統將互動式引導用戶選擇要停止的排程。
+        - 回傳：
+            • str：JSON 字串格式，顯示停止排程成功或失敗的訊息。
         """
 
     def summarize_thinking(self, thinking_content: str) -> str:
@@ -234,7 +259,6 @@ class AgentService:
         # Check for interruptions
         retrieved_data = self.user_state.get_state(user_id)
         waiting_human_response = retrieved_data.get("waiting_human_response", False)
-        
         if waiting_human_response:
             retrieved_data["waiting_human_response"] = False
             self.user_state.update_state(user_id, retrieved_data)
@@ -488,10 +512,5 @@ class AgentService:
         messages = state.get("messages")
         last_message = messages[-1].content
         return "tools" if '<tool_call>' in last_message else "decision_maker"
-
-
-
-
-
 
 

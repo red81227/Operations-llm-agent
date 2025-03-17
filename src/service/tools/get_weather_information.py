@@ -389,3 +389,184 @@ def schedule_get_weather_information(
                 'status': '沒有執行工具，使用者希望對工具執行做調整',
                 'human_respond': user_approval,
             }, ensure_ascii=False)
+
+@tool
+def list_weather_schedules(
+    config: RunnableConfig
+) -> str:
+    """
+    列出當前使用者的所有進行中的天氣預報排程。
+
+    此工具會返回使用者目前啟動的所有天氣預報定時任務，包含每個任務的詳細資訊，
+    如查詢地點、氣象要素、開始和結束時間、更新頻率等。
+
+    Returns:
+        包含所有進行中定時任務的 JSON 字符串
+    """
+    try:
+        user_id = str(config["configurable"]["user_id"])
+        scheduler = get_scheduler()
+        
+        # 獲取所有排程
+        jobs = scheduler.get_jobs()
+        
+        # 篩選屬於當前使用者的排程
+        user_jobs = []
+        for job in jobs:
+            job_id = job.id
+            
+            # 檢查 job_id 是否含有使用者 ID，或使用參數傳遞的 user_id
+            if f"weather_{user_id}" in job_id or (len(job.args) >= 2 and job.args[1] == user_id):
+                # 提取排程資訊
+                job_args = job.args
+                
+                # 確保 job_args 結構正確，否則跳過
+                if len(job_args) < 4:
+                    continue
+                    
+                _, target_user_id, locations, elements = job_args
+                
+                # 組織排程資訊
+                schedule_info = {
+                    'job_id': job_id,
+                    'locations': locations,
+                    'elements': elements,
+                    'start_time': job.next_run_time.strftime("%Y-%m-%d %H:%M:%S") if job.next_run_time else "排程已暫停",
+                    'end_time': job.end_date.strftime("%Y-%m-%d %H:%M:%S") if hasattr(job, 'end_date') and job.end_date else "無結束時間",
+                    'interval_seconds': job.trigger.interval.seconds if hasattr(job.trigger, 'interval') else None,
+                    'status': "進行中" if job.next_run_time else "已暫停"
+                }
+                user_jobs.append(schedule_info)
+        
+        if not user_jobs:
+            return json.dumps({
+                'status': 'info',
+                'message': '您目前沒有進行中的天氣預報排程。'
+            }, ensure_ascii=False)
+        
+        return json.dumps({
+            'status': 'success',
+            'message': f'找到 {len(user_jobs)} 個進行中的天氣預報排程。',
+            'schedules': user_jobs
+        }, ensure_ascii=False)
+        
+    except Exception as e:
+        log.error(f"Error listing weather schedules: {str(e)}")
+        return json.dumps({
+            'status': 'error',
+            'message': f'獲取天氣預報排程時發生錯誤: {str(e)}'
+        }, ensure_ascii=False)
+
+
+@tool
+def stop_weather_schedule(
+    job_id: Annotated[str, InjectedToolArg],
+    config: RunnableConfig
+) -> str:
+    """
+    停止指定的天氣預報排程任務。
+
+    用戶可以通過提供排程任務的 job_id 來停止特定的天氣預報排程。
+    如果用戶沒有提供 job_id，系統會請求用戶先使用 list_weather_schedules 工具
+    查詢目前進行中的排程，然後選擇要停止的排程。
+
+    Args:
+        job_id: 要停止的排程任務 ID (通過 list_weather_schedules 獲取)
+
+    Returns:
+        包含操作結果的 JSON 字符串
+    """
+    try:
+        user_id = str(config["configurable"]["user_id"])
+        scheduler = get_scheduler()
+        
+        # 如果未提供 job_id，獲取用戶的所有排程並讓用戶選擇
+        if not job_id:
+            # 獲取用戶的所有排程
+            jobs = scheduler.get_jobs()
+            user_jobs = []
+            
+            for job in jobs:
+                job_id_str = job.id
+                
+                # 檢查 job_id 是否含有使用者 ID，或使用參數傳遞的 user_id
+                if f"weather_{user_id}" in job_id_str or (len(job.args) >= 2 and job.args[1] == user_id):
+                    if len(job.args) >= 4:
+                        _, _, locations, elements = job.args
+                        location_str = ", ".join(locations)
+                        element_str = ", ".join(elements)
+                        
+                        job_info = {
+                            'job_id': job_id_str,
+                            'description': f"{location_str} 的 {element_str}",
+                            'next_run': job.next_run_time.strftime("%Y-%m-%d %H:%M:%S") if job.next_run_time else "排程已暫停"
+                        }
+                        user_jobs.append(job_info)
+            
+            if not user_jobs:
+                return json.dumps({
+                    'status': 'info',
+                    'message': '您目前沒有進行中的天氣預報排程。'
+                }, ensure_ascii=False)
+            
+            # 格式化選擇清單
+            options = "\n".join([f"{i+1}. ID: {j['job_id']} - {j['description']} (下次執行: {j['next_run']})" 
+                               for i, j in enumerate(user_jobs)])
+            
+            # 請使用者選擇要停止的排程
+            user_choice = interrupt({
+                "question": f"請選擇要停止的天氣預報排程（輸入對應的數字）：\n{options}\n\n或輸入「取消」以放棄操作。"
+            })
+            
+            # 處理使用者選擇
+            try:
+                if user_choice.lower() in ["取消", "cancel", "no", "否"]:
+                    return json.dumps({
+                        'status': 'cancelled',
+                        'message': '已取消停止排程的操作。'
+                    }, ensure_ascii=False)
+                
+                choice_index = int(user_choice.strip()) - 1
+                if 0 <= choice_index < len(user_jobs):
+                    job_id = user_jobs[choice_index]['job_id']
+                else:
+                    return json.dumps({
+                        'status': 'error',
+                        'message': f'無效的選擇：{user_choice}，請輸入 1 到 {len(user_jobs)} 之間的數字。'
+                    }, ensure_ascii=False)
+            except ValueError:
+                return json.dumps({
+                    'status': 'error',
+                    'message': f'無效的輸入：{user_choice}，請輸入數字。'
+                }, ensure_ascii=False)
+        
+        # 嘗試移除排程
+        job = scheduler.get_job(job_id)
+        if not job:
+            return json.dumps({
+                'status': 'error',
+                'message': f'找不到指定的排程 ID：{job_id}'
+            }, ensure_ascii=False)
+        
+        # 確認此排程確實屬於當前使用者
+        job_args = job.args
+        if len(job_args) >= 2 and job_args[1] != user_id and f"weather_{user_id}" not in job_id:
+            return json.dumps({
+                'status': 'error',
+                'message': '您無權停止其他使用者的排程。'
+            }, ensure_ascii=False)
+        
+        # 移除排程
+        scheduler.remove_job(job_id)
+        
+        return json.dumps({
+            'status': 'success',
+            'message': f'已成功停止天氣預報排程 (ID: {job_id})。'
+        }, ensure_ascii=False)
+        
+    except Exception as e:
+        log.error(f"Error stopping weather schedule: {str(e)}")
+        return json.dumps({
+            'status': 'error',
+            'message': f'停止天氣預報排程時發生錯誤: {str(e)}'
+        }, ensure_ascii=False)

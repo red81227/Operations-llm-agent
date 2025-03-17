@@ -8,41 +8,24 @@ To create a maintenance agent that can be used by project managers (PMs), sales,
 目前處於開發階段，使用氣象局空開 API 作為後端服務的範例。
 Currently in the development phase, with the Meteorological Bureau's Open API serving as a backend service example.
 
-
 ---
-目前的llm agent workflow
-Current workflow of agent
-![Alt text](./workflow_graph.png)
 
 ## Features (已完成功能)
 
 1. **Retrieve real-time data for a target site**
    - 即時獲取目標場域的即時資料。
-
 2. **Establish a scheduled observation service**
    - 建立排程服務，定期觀察目標場域資料。
-
-2. **MQTT Monitoring Service**
-   - 啟動 MQTT 訂閱，過濾訊息並解析內容，提供使用者目標資訊。例如：監控特定設備序列的狀態，檢視是否安裝成功或失敗，並分析失敗的階段。
-
-3. **Additional Information Source**
-   - 在回答中附加判斷依據，例如提供 API 的使用方式與回傳內容、MQTT 的 log 訊息，讓使用者確認資訊的正確性。
 
 ---
 
 ## ToDo (待辦項目)
 
-1. **Get the runing scheduled job**
-   - 查詢執行中的排程服務。
+1. **MQTT Monitoring Service**
+   - 啟動 MQTT 訂閱，過濾訊息並解析內容，提供使用者目標資訊。例如：監控特定設備序列的狀態，檢視是否安裝成功或失敗，並分析失敗的階段。
 
-2. **Stop the runing scheduled job**
-   - 停止執行中的排程服務。
-
-3. **Get the runing MQTT monitoring**
-   - 查詢執行中的MQTT監控。
-
-4. **Stop the runing MQTT monitoring**
-   - 停止執行中的MQTT監控。
+2. **Additional Information Source**
+   - 在回答中附加判斷依據，例如提供 API 的使用方式與回傳內容、MQTT 的 log 訊息，讓使用者確認資訊的正確性。
 
 ---
 
